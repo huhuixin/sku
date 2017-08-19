@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>JD商品属性组合</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+	</head>
+	<style>
+		h2{
+
+		}
+		li{
+			margin: 5px;
+			padding: 3px;
+			border:2px solid;
+			-moz-border-radius: 15px;      /* Gecko browsers */
+    		-webkit-border-radius: 15px;   /* Webkit browsers */
+    		border-radius:8px;            /* W3C syntax */
+			font-size: 16px;
+		}
+		span{
+			font-size: 20px;
+			color: #8B6508;
+		}
+		.select{
+			border-color: red;
+		}
+		.disabled{
+			border-color: gray;
+			border: 2px dashed;
+		}
+		.no-choose{
+			background-color: pink;
+		}
+	</style>
+	<body>
+		<div class="container">
+			<div class="row clearfix">
+				<div class="col-md-12 column">
+					<div class="page-header">
+						<h3>
+							京东商城商品SKU演示 <small> _ Huixin.Hu <a href="">Github</a></small>
+						</h3>
+					</div>
+					<div class="row clearfix">
+						<div class="col-md-12 column" id="choose-attrs">
+
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="container" style="margin-top: 20px">
+			<div class="row clearfix">
+				<div class="col-md-12 column">
+					 <button type="button" id="toJD" class="btn btn-default btn-block btn-primary">去京东看看</button>
+				</div>
+			</div>
+		</div>
+		<!-- <div id="choose-attrs">
+		</div> -->
+		<script src="http://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+		<script type="text/javascript" src="SimilarSku.js"></script>
+		<script type="text/javascript" src="util.js"></script>
+		<script type="text/javascript">
+
+		$(document).ready(function(){
+			var $choose_attrs = $("#choose-attrs")//父元素
+			var cur_sku = 3278880;//代表本页面的skuId 3468480,3082133
+			//存储所有属性组的当前选项,若没有选择置为空数组;
+			var choose_sku = new Array();
+			loadAttr();
+			function loadAttr(){
+				//假数据
+				var data = similarSkuData;
+				if(data.success && data.result.length > 0){
+				addAttrGroup(data.result);
+				format();
+				}else console.log("没有同类商品");
+			}
+
+			//点击属性时
+			$choose_attrs.on("click",".item",function(){
+				//改变choose_sku 的值,重置除红色之外的商品样式
+				var $this = $(this);
+				var $group = $this.parent();
+				console.log($this);
+				if($this.hasClass("select")){
+					//点击红色背景
+					console.log("已经选中的SKU");
+				}else{
+					//如果是 no-choose状态 去掉该状态
+					//去掉该组其他的select  ,并给 $this添加 select
+					//将其他两组的状态根据是否拥有新选中的skuids 置为no-choose状态
+					if($group.hasClass("no-choose")){
+						$group.removeClass("no-choose");
+					}
+					//当前选中的状态设置select
+					$group.find(".select").removeClass("select");
+					$this.addClass("select");
+					//改变choose_sku
+					var thisSkus = $this.attr("skuids").toString().split(",");
+					//所属属性组下标
+					var groupId = $group.attr("id").toString();
+					//当前组索引
+					var groupIndex = parseInt(groupId.charAt(groupId.length - 1));
+					var choose_sku_intersection = getIntersection(choose_sku);//当前选中的所有集合的交集
+					choose_sku[groupIndex] = thisSkus;
+					if($this.hasClass("disabled")){
+						console.log("this is disabled");
+						//选择灰色
+						$this.removeClass("disabled");
+						console.log("remove disabled");
+						for(var i = 0 ; i < choose_sku.length ; i++){
+							if (groupIndex != i) {
+								//取交集,若大于0,则保持原装,否则移除该组的choose_sku 并置为no-choose状态
+								var intersection = Array.intersect(choose_sku[groupIndex],choose_sku_intersection);
+								//console.log(intersection);
+								if(intersection.length > 0){
+									console.log("有交集");
+								}else{
+									console.log("没有交集");
+									var $otherGroup = $("#choose-attr-" + i);
+									$otherGroup.find(".select").removeClass("select");
+									$otherGroup.addClass("no-choose");
+									choose_sku[i] = new Array();
+								}
+							}
+						}
+					}else{
+						if(isAllChoose()){
+							newSku();
+						}
+						console.log("未选中所有属性.")
+					}
+					//根据choose状态重置各个属性组的选择状态
+					format()
+				}
+			})
+
+			$("#toJD").on("click",function(){
+				window.open("https://item.jd.com/"+ cur_sku + ".html");  
+			})
+
+			function newSku(){
+				//跳转页面
+				var sku = getIntersection(choose_sku);
+				//location.reload();
+				//模拟跳转
+				cur_sku = sku;
+			}
+			
+			//判断每组商品是否都有属性被select 
+			function isAllChoose(){
+				return $(".no-choose").length == 0;
+			}
+
+			//初始化属性值的可点击状态
+			function format(){
+				//console.log(choose_sku);
+				//根据当前SKU的选择状态确定各个属性的显示状态/是否置灰
+				//如果只有一列属性,那么所有的属性都是可以点击的,不作处理
+				if(choose_sku.length > 1){
+					//多列属性的情况下,依次处理各个属性组的样式
+					for(var i = 0 ; i < choose_sku.length ; i++){
+						//获取除当前组外,其他组的skus的交集
+						var intersection = getIntersection(getOtherArr(choose_sku,i))
+						//console.log("其他两组的交集"+intersection);
+						//根据其他组的属性取出的交集 与 该组元素的skuids再取交集 大于0则代表可选 否则置灰
+						$("#choose-attr-" + i + " li").each(function(){
+							var $this = $(this);
+							//console.log($this);
+							var thisSkus = $this.attr("skuids").toString().split(",");
+							var intersection2 = Array.intersect(intersection,thisSkus);
+							//console.log(intersection + " 交 " + thisSkus +  " = " +intersection2);
+							if(intersection2.length > 0){
+								//console.log($this.text() + '可用');
+								if($this.hasClass("disabled")){
+									$this.removeClass("disabled");
+								}
+							}else{
+								console.log($this.text() + '不可用');
+								$this.addClass("disabled");
+							}
+						});
+					}
+				}
+			}
+
+			function addAttrGroup(data){
+				//console.log(data)
+				var $attrs,attrsData;
+				for(var i = 0 ; i < data.length ; i++){
+					var attr = data[i];
+					//console.log(attr);
+					var attrId = 'choose-attr-' + i;
+					$choose_attrs.append("<span>"+attr.saleName+":</span>"
+					+"<ul class='list-inline' id='"+attrId+"'></ul>")
+					//生成属性值Element
+					$attrs = $("#"+attrId);
+					attrsData = attr.saleAttrList;
+					for(var j = 0 ; j < attrsData.length ; j++){
+						//console.log(s);
+						addAttrValue($attrs,attrsData[j]);
+					}
+				}
+			}
+
+			function addAttrValue($parentNode , childData){
+				//添加子列表元素
+				//console.log(childData)
+				var value = childData.saleValue;
+				var skuIds = childData.skuIds;
+				var className = "item";
+				if (isConSku(cur_sku,skuIds)) {
+					choose_sku.push(skuIds);
+					className += " select"; 
+				}
+				$parentNode.append("<li class='"+className+"' skuIds='"+skuIds+"'>"+value+"</li>");
+
+			}
+		})
+		</script>
+	</body>
+</html>
